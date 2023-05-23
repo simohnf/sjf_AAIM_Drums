@@ -9,7 +9,11 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "../sjf_AAIM_Cplusplus/sjf_AAIM_rhythmGen.h"
+#include "../sjf_AAIM_Cplusplus/sjf_AAIM_patternVary.h"
+#include "../sjf_AAIM_Cplusplus/sjf_audio/sjf_audioUtilitiesC++.h"
 
+#define NUM_VOICES 16
 //==============================================================================
 /**
 */
@@ -57,6 +61,20 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
 private:
+    
+    AAIM_rhythmGen< float > m_rGen;
+    std::array< AAIM_patternVary< float >, NUM_VOICES > m_pVary;
+    
+    juce::AudioPlayHead* playHead;
+    juce::AudioPlayHead::PositionInfo positionInfo;
+    
+    enum beatDivisions
+    {
+        halfNote = -1, quarterNote = 0, eightNote, sixteenthNote, thirtySecondNote
+    };
+    
+    int m_TSdenominator = eightNote;
+    double m_lastRGenPhase = 1;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Sjf_AAIM_DrumsAudioProcessor)
 };

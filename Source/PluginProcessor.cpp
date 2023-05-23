@@ -22,6 +22,24 @@ Sjf_AAIM_DrumsAudioProcessor::Sjf_AAIM_DrumsAudioProcessor()
                        )
 #endif
 {
+    DBG("AAIM Drums");
+    m_rGen.setIOIProbability( 0.5, 1 );
+    m_rGen.setComplexity( 0.8 );
+    m_rGen.setRests( 0.2 );
+    DBG( m_rGen.getRests() << " " << m_rGen.getComplexity() );
+    
+    for ( size_t i = 0; i < m_pVary.size(); i++ )
+    {
+        std::string pat;
+        for ( size_t j = 0; j < m_pVary[ i ].getNumBeats(); j++ )
+        {
+            auto trig = rand01() > 0.75 ? true : false;
+            m_pVary[ i ].setBeat( j, trig );
+            if ( trig ) { pat += "1"; }
+            else { pat += "0"; }
+        }
+        DBG( "m_pVary" << i << " pat " << pat );
+    }
 }
 
 Sjf_AAIM_DrumsAudioProcessor::~Sjf_AAIM_DrumsAudioProcessor()
@@ -132,30 +150,62 @@ bool Sjf_AAIM_DrumsAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 void Sjf_AAIM_DrumsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
-
-    // In case we have more outputs than inputs, this code clears any output
-    // channels that didn't contain input data, (because these aren't
-    // guaranteed to be empty - they may contain garbage).
-    // This is here to avoid people getting screaming feedback
-    // when they first compile a plugin, but obviously you don't need to keep
-    // this code if your algorithm always overwrites all the output channels.
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
+    auto bufferSize = buffer.getNumSamples();
+    // if there is an available playhead
+    auto beatDivFactor = std::pow( 2, static_cast< double >(m_TSdenominator) ); // multiple for converting from quarterNotes to other beat types
+    
+    midiMessages.clear();
+    playHead = this->getPlayHead();
+    if (playHead != nullptr)
     {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
+        positionInfo = *playHead->getPosition();
+        if( positionInfo.getPpqPosition() )
+        {
+            if ( positionInfo.getBpm() )
+            {
+//                auto ppq = *positionInfo.getPpqPosition();
+                auto timeInSamps = static_cast<double>(*positionInfo.getTimeInSamples());
+//                DBG("timeInSamps " << timeInSamps );
+//                DBG("next Time " << (timeInSamps + bufferSize) );
+//                auto ppb = ppq * beatDivFactor;
+                auto nBeats = static_cast< double >(m_rGen.getNumBeats());
+//                auto pos = fastMod4(ppb, nBeats);
+                auto bpm = *positionInfo.getBpm();
+                auto sr = getSampleRate();
+//                auto sampsPerBeat = ( sr * static_cast< double >(60) ) / bpm;
+//                DBG("sampsPerBeat " << sampsPerBeat);
+                auto pos = ( (bpm * beatDivFactor * timeInSamps) / ( sr * static_cast< double >(60) ) );
+//                DBG("pos " << pos);
+                auto increment = (static_cast<double>(bpm) * beatDivFactor )/ ( sr * static_cast< double >(60) );
+                for ( int i = 0; i < bufferSize; i++ )
+                {
+                    auto currentBeat = fastMod4< double >( (pos + ( i * increment )), nBeats );
+                    auto genOut = m_rGen.runGenerator( currentBeat );
+                    if ( genOut[ 0 ] < m_lastRGenPhase*0.5 )
+                    {
+//                        DBG( "!!!!!! rGen Trigger: CurrentBeat " << currentBeat << " beatsToSync " << genOut[ 4 ] );
+                        for ( size_t j = 0; j < m_pVary.size(); j++ )
+                        {
+                            if ( m_pVary[ j ].triggerBeat( currentBeat, genOut[ 4 ] ) && genOut[ 2 ] > 0 )
+                            {
+                                auto note = juce::MidiMessage::noteOn( 1, static_cast<int>(j)+36, genOut[ 1 ] );
+                                midiMessages.addEvent( note, i );
+//                                DBG( "NOTE OUT " << j << " "<< genOut[ 1 ] << " " << genOut[ 2 ] );
+                            }
+                        }
+                    }
+                    m_lastRGenPhase = genOut[ 0 ];
+                }
+            }
+        }
+//        DBG("");
+//        if ( positionInfo.getTimeSignature() )
+//        {
+//            auto TS = *positionInfo.getTimeSignature();
+//            DBG( "Time Signature " << TS.numerator << " / " << TS.denominator );
+//        }
     }
+    
 }
 
 //==============================================================================
