@@ -443,12 +443,12 @@ void Sjf_AAIM_DrumsAudioProcessor::selectPatternBank( size_t bankNumber )
 {
     auto div = m_divBanks[ bankNumber ];
     parameters.state.setProperty( "tsDenominator", static_cast<int>(div), nullptr );
-//    parameters.state
-    //    *tsDenominatorParameter = div;
+    
+    *tsDenominatorParameter = div;
     m_tsDenominator = static_cast<int>(div);
     auto nBeats = m_nBeatsBanks[ bankNumber ];
     parameters.state.setProperty( "nBeats", static_cast<int>(nBeats), nullptr );
-//    *nBeatsParameter = nBeats;
+    *nBeatsParameter = nBeats;
     m_rGen.setNumBeats( nBeats );
     for ( size_t i = 0; i < NUM_VOICES; i++ )
     {
