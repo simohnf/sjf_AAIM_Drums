@@ -12,10 +12,14 @@
 #include "../sjf_AAIM_Cplusplus/sjf_AAIM_rhythmGen.h"
 #include "../sjf_AAIM_Cplusplus/sjf_AAIM_patternVary.h"
 #include "../sjf_AAIM_Cplusplus/sjf_audio/sjf_audioUtilitiesC++.h"
+#include <algorithm>    // std::shuffle
+#include <vector>       // std::vector
+#include <random>       // std::default_random_engine
 
 #define NUM_VOICES 16
 #define MAX_NUM_STEPS 32
 #define NUM_IOIs 26
+#define NUM_BANKS 16
 //==============================================================================
 /**
 */
@@ -71,11 +75,12 @@ public:
     void setIOIProbability( float division, float chanceForThatDivision)
     { m_rGen.setIOIProbability( division, chanceForThatDivision); };
     
-    std::vector< std::array< float , 4> > getIOIProbability( )
-    { return m_rGen.getIOIProbabilities(); };
+    std::vector< std::array< float , 4> > getIOIProbability( ) { return m_rGen.getIOIProbabilities(); }
     
     bool stateLoaded(){ return m_stateLoadedFlag; }
     void setStateLoadedFalse( ){ m_stateLoadedFlag = false; }
+    
+    void setBankSaveFlag(){ m_bankSaveFlag = true; }
     
     static constexpr std::array< float, NUM_IOIs > ioiFactors
     {
@@ -85,13 +90,53 @@ public:
     
     void setNonAutomatableParameterValues();
     
+    int getCurrentStep(){ return m_currentStep; }
+
+    void setPatternBankContents( size_t bankNumber );
+    
+    void setCurrentPattern( size_t bankNumber ){ m_patternBank = bankNumber; }
+    size_t getCurrentBank(){ return m_patternBank; }
+    
+    void copyPatternBankContents( size_t bankToCopyFrom, size_t bankToCopyTo );
+    
+    void selectPatternBank( size_t bankNumber );
+    
+    void reversePattern();
+    
+    void markovHorizontal();
+    
+//    void markovVertical();
+    
+    void cellShuffleVariation();
+    
+    void palindromeVariation();
+    
+    void doublePattern();
+    
+    void rotatePattern( bool trueIfLeftFalseIfRight);
+    
+    size_t getNumBeats(){ return m_rGen.getNumBeats(); }
+    
+    
+    int getTsDenominator(){ return m_tsDenominator; }
+    
+    
+    void setPatternBankRecallState( int newState ){ m_patternBankState = newState; }
+    enum patternBankStates
+    {
+        doNothing = 0, reloadBank, saveAndLoadNewBank, copyToNewBank, loadButDontSave
+    };
+    
+    
+    void setHasEditiorFlag( bool hasEditor ){ m_hasEditorFlag = hasEditor; }
+    
 private:
     
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     
     void setParameters();
     
-    
+    void setPatternBankSelection();
     
     static BusesProperties getBusesLayout()
     {
@@ -127,7 +172,7 @@ private:
         halfNote = 1, quarterNote, eightNote, sixteenthNote, thirtySecondNote, sixtyFourthNote
     };
     
-    int m_tsDenominator = eightNote, m_midiChannel = 1;
+    int m_tsDenominator = eightNote, m_midiChannel = 1, m_currentStep = -1, m_patternBankState = loadButDontSave;
     double m_lastRGenPhase = 1;
     
 
@@ -138,11 +183,18 @@ private:
     std::atomic<float>* restsParameter = nullptr;
     std::atomic<float>* fillsParameter = nullptr;
     std::atomic<float>* nBeatsParameter = nullptr;
+    std::atomic<float>* bankNumberParameter = nullptr;
     
-//    juce::Value ioiProbsParameter;
+    
+    
     std::array< juce::Value, NUM_IOIs > ioiDivParameters, ioiProbParameters;
     std::array< juce::Value, NUM_VOICES > patternParameters;
-    bool m_stateLoadedFlag = false;
+    std::array< std::array< juce::Value, NUM_VOICES >, NUM_BANKS > patternBanksParameters;
+    std::array< juce::Value, NUM_BANKS > patternBanksNumBeatsParameters, divBanksParameters;
+    std::array< std::array< std::bitset< MAX_NUM_STEPS >, NUM_VOICES >, NUM_BANKS > m_patternBanks;
+    std::array< size_t, NUM_BANKS > m_nBeatsBanks, m_divBanks;
+    bool m_stateLoadedFlag = false, m_hasEditorFlag = false, m_bankSaveFlag = false;
+    size_t m_patternBank = 0;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Sjf_AAIM_DrumsAudioProcessor)
 };

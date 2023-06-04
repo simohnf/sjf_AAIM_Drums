@@ -7,6 +7,7 @@
               pluginFormats="buildAU,buildAUv3,buildVST3" cppLanguageStandard="20">
   <MAINGROUP id="OwYH1n" name="sjf_AAIM_Drums">
     <GROUP id="{9CB956B6-2F00-4B79-BA6A-C88F7F714F4C}" name="Source">
+      <FILE id="zPzSl0" name="aaim_logo.png" compile="0" resource="1" file="sjf_AAIM_Cplusplus/aaim_logo.png"/>
       <FILE id="EgQeaD" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="ufo6hl" name="PluginProcessor.h" compile="0" resource="0"
