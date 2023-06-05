@@ -80,8 +80,6 @@ public:
     bool stateLoaded(){ return m_stateLoadedFlag; }
     void setStateLoadedFalse( ){ m_stateLoadedFlag = false; }
     
-    void setBankSaveFlag(){ m_bankSaveFlag = true; }
-    
     static constexpr std::array< float, NUM_IOIs > ioiFactors
     {
         4., 3.2, 3., 2.666667, 2.285714, 2., 1.6, 1.5, 1.333333, 1.142857, 1., 0.8, 0.75, 0.666667, 0.571429, 0.5, 0.4, 0.375, 0.333333, 0.285714, 0.25, 0.2, 0.1875, 0.166667, 0.142857, 0.125
@@ -91,21 +89,14 @@ public:
     void setNonAutomatableParameterValues();
     
     int getCurrentStep(){ return m_currentStep; }
-
-    void setPatternBankContents( size_t bankNumber );
-    
-    void setCurrentPattern( size_t bankNumber ){ m_patternBank = bankNumber; }
-    size_t getCurrentBank(){ return m_patternBank; }
     
     void copyPatternBankContents( size_t bankToCopyFrom, size_t bankToCopyTo );
     
-    void selectPatternBank( size_t bankNumber );
+    void selectPatternBank();
     
     void reversePattern();
     
     void markovHorizontal();
-    
-//    void markovVertical();
     
     void cellShuffleVariation();
     
@@ -115,20 +106,11 @@ public:
     
     void rotatePattern( bool trueIfLeftFalseIfRight);
     
-    size_t getNumBeats(){ return m_rGen.getNumBeats(); }
+    void setNumBeats( int nBeats ) { m_nBeatsBanks[ *bankNumberParameter ] = nBeats; }
+    size_t getNumBeats(){ return m_nBeatsBanks[ *bankNumberParameter ]; }
     
-    
-    int getTsDenominator(){ return m_tsDenominator; }
-    
-    
-    void setPatternBankRecallState( int newState ){ m_patternBankState = newState; }
-    enum patternBankStates
-    {
-        doNothing = 0, reloadBank, saveAndLoadNewBank, copyToNewBank, loadButDontSave
-    };
-    
-    
-    void setHasEditiorFlag( bool hasEditor ){ m_hasEditorFlag = hasEditor; }
+    void setTsDenominator( int tsDenominator ){ m_divBanks[ *bankNumberParameter ] = tsDenominator; }
+    int getTsDenominator(){ return static_cast<int>( m_divBanks[ *bankNumberParameter ] ); }
     
 private:
     
@@ -147,20 +129,7 @@ private:
     
     juce::AudioProcessorValueTreeState parameters;
     
-    std::vector< std::array < float, 2 > > genIOIlist()
-    {
-        auto ioiList = std::vector< std::array < float, 2 > >();
-        for ( size_t i = 0; i < NUM_IOIs; i++ )
-        {
-            auto prob = ioiFactors[ i ] == 1 ? 1.0f : 0.0f;
-            ioiList.push_back( std::array < float, 2 >{ ioiFactors[ i ], prob } );
-        }
-        return ioiList;
-    }
-    
-    
     AAIM_rhythmGen< float > m_rGen;
-    
 
     std::array< AAIM_patternVary< float >, NUM_VOICES > m_pVary;
     
@@ -172,29 +141,27 @@ private:
         halfNote = 1, quarterNote, eightNote, sixteenthNote, thirtySecondNote, sixtyFourthNote
     };
     
-    int m_tsDenominator = eightNote, m_midiChannel = 1, m_currentStep = -1, m_patternBankState = loadButDontSave;
+    int /*m_tsDenominator = eightNote,*/ m_midiChannel = 1, m_currentStep = -1/*, m_patternBankState = loadButDontSave,*/ /*m_nBeats = 8*/;
     double m_lastRGenPhase = 1;
     
 
-    
-    std::atomic<float>* tsDenominatorParameter = nullptr;
+    // REWRITE SO ALL CHANGES ARE AUTOMATICALLY IN PATTERN BANK... THIS COULD BE A PAIN FOR UNDO, BUT NOT THE END OF THE WORLD
     std::atomic<float>* midiChannelParameter = nullptr;
     std::atomic<float>* complexityParameter = nullptr;
     std::atomic<float>* restsParameter = nullptr;
     std::atomic<float>* fillsParameter = nullptr;
-    std::atomic<float>* nBeatsParameter = nullptr;
     std::atomic<float>* bankNumberParameter = nullptr;
     
     
     
     std::array< juce::Value, NUM_IOIs > ioiDivParameters, ioiProbParameters;
-    std::array< juce::Value, NUM_VOICES > patternParameters;
+//    std::array< juce::Value, NUM_VOICES > patternParameters;
     std::array< std::array< juce::Value, NUM_VOICES >, NUM_BANKS > patternBanksParameters;
     std::array< juce::Value, NUM_BANKS > patternBanksNumBeatsParameters, divBanksParameters;
     std::array< std::array< std::bitset< MAX_NUM_STEPS >, NUM_VOICES >, NUM_BANKS > m_patternBanks;
     std::array< size_t, NUM_BANKS > m_nBeatsBanks, m_divBanks;
-    bool m_stateLoadedFlag = false, m_hasEditorFlag = false, m_bankSaveFlag = false;
-    size_t m_patternBank = 0;
+    bool m_stateLoadedFlag = false;
+//    size_t m_patternBank = 0;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Sjf_AAIM_DrumsAudioProcessor)
 };

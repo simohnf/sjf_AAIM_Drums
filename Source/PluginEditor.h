@@ -42,8 +42,8 @@ private:
     sjf_numBox nBeatsNumBox;
     juce::ComboBox divisionComboBox;
     
-    std::unique_ptr< juce::AudioProcessorValueTreeState::SliderAttachment > compSliderAttachment, restSliderAttachment, fillsSliderAttachment, nBeatsNumBoxAttachment, bankNumberAttachment;
-    std::unique_ptr< juce::AudioProcessorValueTreeState::ComboBoxAttachment > divisionComboBoxAttachment;
+    std::unique_ptr< juce::AudioProcessorValueTreeState::SliderAttachment > compSliderAttachment, restSliderAttachment, fillsSliderAttachment, /*nBeatsNumBoxAttachment,*/ bankNumberAttachment;
+//    std::unique_ptr< juce::AudioProcessorValueTreeState::ComboBoxAttachment > divisionComboBoxAttachment;
     
     sjf_multitoggle patternMultiTog, patternBankMultiTog;
     sjf_multislider ioiProbsSlider;

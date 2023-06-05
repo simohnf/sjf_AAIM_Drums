@@ -4,7 +4,8 @@
               addUsingNamespaceToJuceHeader="0" displaySplashScreen="1" jucerFormatVersion="1"
               companyWebsite="https://simohnf.github.io./" pluginCharacteristicsValue="pluginIsMidiEffectPlugin,pluginProducesMidiOut,pluginWantsMidiIn"
               pluginManufacturer="sjf" pluginVST3Category="Drum,Instrument"
-              pluginFormats="buildAU,buildAUv3,buildVST3" cppLanguageStandard="20">
+              pluginFormats="buildAU,buildAUv3,buildVST3" cppLanguageStandard="20"
+              pluginAUMainType="'aumi'">
   <MAINGROUP id="OwYH1n" name="sjf_AAIM_Drums">
     <GROUP id="{9CB956B6-2F00-4B79-BA6A-C88F7F714F4C}" name="Source">
       <FILE id="zPzSl0" name="aaim_logo.png" compile="0" resource="1" file="sjf_AAIM_Cplusplus/aaim_logo.png"/>
