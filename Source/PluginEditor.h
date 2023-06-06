@@ -18,6 +18,55 @@
 //==============================================================================
 /**
 */
+class sjf_positionDisplay : public juce::Component
+{
+public:
+    sjf_positionDisplay()
+    {
+        m_bgColour = juce::Colours::black.withAlpha( 0.2f );
+        m_fgColour = juce::Colours::white.withAlpha( 0.2f );
+    }
+    ~sjf_positionDisplay(){}
+    
+    void paint (juce::Graphics& g) override
+    {
+        g.setColour( m_bgColour );
+        g.fillAll( m_bgColour );
+        
+        g.setColour( m_fgColour );
+        auto w = static_cast< float >( getWidth() ) / static_cast< float >( m_nSteps );
+        auto r = juce::Rectangle< float >( m_Xpos, 0, w, getHeight() );
+        g.fillRect( r );
+    }
+    
+    void setBackGroundColour( juce::Colour c )
+    {
+        m_bgColour = c;
+    }
+    
+    void setForeGroundColour( juce::Colour c )
+    {
+        m_fgColour = c;
+    }
+    
+    void setCurrentStep( int step )
+    {
+        m_Xpos = static_cast< float >( getWidth() * step ) / static_cast< float >( m_nSteps );
+        DBG("posX " << m_Xpos << " step " << step );
+        repaint();
+    }
+    
+    void setNumSteps( int steps )
+    {
+        m_nSteps = steps;
+    }
+    
+private:
+    juce::Colour m_bgColour, m_fgColour;
+    float m_Xpos = 0;
+    int m_nSteps = 32;
+};
+
 class Sjf_AAIM_DrumsAudioProcessorEditor  : public juce::AudioProcessorEditor, public juce::Timer
 {
 public:
@@ -36,9 +85,13 @@ private:
     
     void setIOISliderValues();
     void setPattern();
+    void setPatternMultiTogColours();
+    void displayChangedIOI();
+    
     juce::AudioProcessorValueTreeState& valueTreeState;
     
     juce::Slider compSlider, restSlider, fillsSlider, bankNumber;
+    
     sjf_numBox nBeatsNumBox;
     juce::ComboBox divisionComboBox;
     
@@ -46,6 +99,7 @@ private:
 //    std::unique_ptr< juce::AudioProcessorValueTreeState::ComboBoxAttachment > divisionComboBoxAttachment;
     
     sjf_multitoggle patternMultiTog, patternBankMultiTog;
+    sjf_positionDisplay posDisplay;
     sjf_multislider ioiProbsSlider;
     sjf_lookAndFeel otherLookAndFeel;
     
@@ -64,9 +118,9 @@ private:
     juce::Image AAIM_logo = juce::ImageFileFormat::loadFrom( BinaryData::aaim_logo_png, BinaryData::aaim_logo_pngSize );
 
     
-    int m_selectedBank = 0;
+    int m_selectedBank = 0, m_lastStep = -1;
     size_t m_changedIOI = 0;
-    bool m_mouseUpFlag = false;
+    bool m_nBeatsDragFlag = false;
     
     std::array< float, NUM_IOIs > m_ioiProbs;
     juce::Label ioiLabel;

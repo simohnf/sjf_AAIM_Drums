@@ -185,7 +185,8 @@ void Sjf_AAIM_DrumsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
         positionInfo = *playHead->getPosition();
         if ( positionInfo.getIsPlaying() && positionInfo.getBpm() && positionInfo.getTimeInSamples() )
         {
-            auto beatDivFactor = std::pow( 2, static_cast< double >( m_divBanks[ *bankNumberParameter ] - 2) ); // multiple for converting from quarterNotes to other beat types
+            auto indx = static_cast< double >( static_cast<int>(m_divBanks[ *bankNumberParameter ]) - 2 );
+            auto beatDivFactor = std::pow( 2.0f, indx ); // multiple for converting from quarterNotes to other beat types
             auto nBeats = static_cast< double >(m_rGen.getNumBeats());
             auto timeInSamps = static_cast< double >(*positionInfo.getTimeInSamples());
             auto bpm = *positionInfo.getBpm();
@@ -344,10 +345,10 @@ void Sjf_AAIM_DrumsAudioProcessor::setParameters()
     selectPatternBank();
     m_rGen.setComplexity( *complexityParameter );
     m_rGen.setRests( *restsParameter );
-    m_rGen.setNumBeats( m_nBeatsBanks[ *bankNumberParameter ] );
+//    m_rGen.setNumBeats( m_nBeatsBanks[ *bankNumberParameter ] );
     for (size_t i = 0; i < m_pVary.size(); i++ )
     {
-        m_pVary[ i ].setNumBeats( m_rGen.getNumBeats() );
+//        m_pVary[ i ].setNumBeats( m_rGen.getNumBeats() );
         m_pVary[ i ].setFills( *fillsParameter );
     }
     m_midiChannel = *midiChannelParameter;
@@ -355,6 +356,8 @@ void Sjf_AAIM_DrumsAudioProcessor::setParameters()
 
 void Sjf_AAIM_DrumsAudioProcessor::selectPatternBank()
 {
+    if ( m_lastLoadedBank == *bankNumberParameter )
+        return;
     m_rGen.setNumBeats( m_nBeatsBanks[ *bankNumberParameter ] );
     for ( size_t i = 0; i < NUM_VOICES; i++ )
     {
@@ -363,6 +366,7 @@ void Sjf_AAIM_DrumsAudioProcessor::selectPatternBank()
             m_pVary[ i ].setBeat( j, m_patternBanks[ *bankNumberParameter ][ i ][ j ] );
     }
 //    updateHostDisplay();
+    m_lastLoadedBank = *bankNumberParameter;
     m_stateLoadedFlag = true;
 }
 

@@ -18,6 +18,8 @@
 Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM_DrumsAudioProcessor& p, juce::AudioProcessorValueTreeState& vts)
     : AudioProcessorEditor (&p), audioProcessor (p), valueTreeState( vts )
 {
+    
+    
     setLookAndFeel( &otherLookAndFeel );
     
     auto multiTogBgCol = findColour( sjf_multitoggle::backgroundColourId ).withAlpha(0.2f);
@@ -54,9 +56,16 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
     nBeatsNumBox.setRange( 1, 32, 1 );
     nBeatsNumBox.setValue( audioProcessor.getNumBeats() );
     nBeatsNumBox.setNumDecimalPlacesToDisplay( 0 );
+    nBeatsNumBox.onDragEnd = [this]
+    {
+        m_nBeatsDragFlag = true;
+    };
     nBeatsNumBox.onValueChange = [this]
     {
+        if ( audioProcessor.stateLoaded() )
+            return;
         audioProcessor.setNumBeats( nBeatsNumBox.getValue() );
+        setPatternMultiTogColours();
     };
     nBeatsNumBox.setTooltip( "This sets the number of beats in the pattern" );
     nBeatsNumBox.sendLookAndFeelChange();
@@ -68,9 +77,10 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
         divisionComboBox.addItem( divNames[ i ], static_cast< int >(i) + 1 );
     }
     divisionComboBox.setSelectedId( audioProcessor.getTsDenominator() );
-//    divisionComboBoxAttachment.reset( new juce::AudioProcessorValueTreeState::ComboBoxAttachment(valueTreeState, "tsDenominator", divisionComboBox) );
     divisionComboBox.onChange = [this]
     {
+        if ( audioProcessor.stateLoaded() )
+            return;
         audioProcessor.setTsDenominator( divisionComboBox.getSelectedId() );
     };
     divisionComboBox.setTooltip( "This sets the underlying pulse of the pattern" );
@@ -129,6 +139,7 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
         for ( size_t i = 0; i < ioiProbsSlider.getNumSliders(); i++ )
             audioProcessor.setIOIProbability( audioProcessor.ioiFactors[ i ], ioiProbsSlider.fetch( static_cast<int>(i) ) );
         audioProcessor.setNonAutomatableParameterValues();
+        displayChangedIOI();
     };
     for ( int i = 0; i < ioiProbsSlider.getNumSliders(); i++ )
         ioiProbsSlider.setSliderColour( static_cast<int>( i ), sliderColours[ i % sliderColours.size() ].withAlpha( 0.6f ) );
@@ -238,13 +249,17 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
     tooltipLabel.setColour( juce::Label::backgroundColourId, otherLookAndFeel.backGroundColour.withAlpha( 0.85f ) );
     tooltipLabel.setTooltip( MAIN_TOOLTIP );
     
-    
     for ( size_t i = 0; i < NUM_IOIs; i++ )
         m_ioiProbs[ 0 ] = 0;
      
     //-------------------------------------------------
+    addAndMakeVisible( &posDisplay );
+    
+    posDisplay.setBackGroundColour( juce::Colours::white.withAlpha( 0.0f ) );
+    posDisplay.setForeGroundColour( juce::Colours::darkred.withAlpha( 0.2f ) );
+    
     setSize (WIDTH, HEIGHT);
-    startTimer( 100 );
+    startTimer( 50 );
 }
 
 Sjf_AAIM_DrumsAudioProcessorEditor::~Sjf_AAIM_DrumsAudioProcessorEditor()
@@ -304,7 +319,10 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::resized()
     
     tooltipsToggle.setBounds( ioiProbsSlider.getRight() - SLIDERSIZE, divisionComboBox.getY(), SLIDERSIZE, TEXT_HEIGHT );
     
+//    posDisplay.setBounds( compSlider.getX(), nBeatsNumBox.getBottom(), SLIDERSIZE*8, TEXT_HEIGHT );
+//    patternMultiTog.setBounds( posDisplay.getX(), posDisplay.getBottom(), SLIDERSIZE*8, SLIDERSIZE*4 );
     patternMultiTog.setBounds( compSlider.getX(), nBeatsNumBox.getBottom(), SLIDERSIZE*8, SLIDERSIZE*4 );
+    posDisplay.setBounds( patternMultiTog.getBounds() );
     patternBankMultiTog.setBounds( patternMultiTog.getX(), patternMultiTog.getBottom(), patternMultiTog.getWidth(), TEXT_HEIGHT );
     
     tooltipLabel.setBounds( 0, HEIGHT, WIDTH, TEXT_HEIGHT*4 );
@@ -315,43 +333,23 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::timerCallback()
 {
     if ( audioProcessor.stateLoaded() )
     {
-        audioProcessor.setStateLoadedFalse();
         nBeatsNumBox.setValue( audioProcessor.getNumBeats() );
         divisionComboBox.setSelectedId( audioProcessor.getTsDenominator() );
         setPattern();
         setIOISliderValues();
+        setPatternMultiTogColours();
+        patternBankMultiTog.setAllToggles( false );
+        patternBankMultiTog.setToggleState( 0, bankNumber.getValue(), true );
+        audioProcessor.setStateLoadedFalse();
     }
-    
-    for ( int i = 0; i < MAX_NUM_STEPS; i++ )
+    auto step = audioProcessor.getCurrentStep();
+    if ( step >= 0 && step != m_lastStep )
     {
-        auto colour1 = otherLookAndFeel.sliderFillColour;
-        if ( i == audioProcessor.getCurrentStep() )
-            patternMultiTog.setColumnColour( i, juce::Colours::darkred );
-        else if( i >= nBeatsNumBox.getValue() )
-            patternMultiTog.setColumnColour( i, juce::Colours::darkgrey );
-        else if ( i % 4 == 0 )
-            patternMultiTog.setColumnColour( i, colour1 );
-        else
-            patternMultiTog.setColumnColour( i, findColour( juce::ToggleButton::tickColourId ) );
+        posDisplay.setCurrentStep( step );
+        m_lastStep = step;
     }
-    
-    patternBankMultiTog.setAllToggles( false );
-    patternBankMultiTog.setToggleState( 0, bankNumber.getValue(), true );
-    
-    sjf_setTooltipLabel( this, MAIN_TOOLTIP, tooltipLabel );
-    
-    
-    auto probs = audioProcessor.getIOIProbability();
-    for ( size_t i = 0; i < probs.size(); i++ )
-    {
-        if ( m_ioiProbs[ i ] != probs[ i ][ 1 ] )
-        {
-            m_ioiProbs[ i ] = probs[ i ][ 1 ];
-            m_changedIOI = i;
-            ioiLabel.setText( "division:"+juce::String( probs[ i ][ 0 ] ) + " chance:" + juce::String( probs[ i ][ 1 ] ), juce::dontSendNotification );
-            break;
-        }
-    }
+    if ( tooltipsToggle.getToggleState() )
+        sjf_setTooltipLabel( this, MAIN_TOOLTIP, tooltipLabel );
 }
 
 
@@ -371,6 +369,8 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::setIOISliderValues()
         }
         ioiProbsSlider.setSliderValue( sliderNum, probs[ i ][ 1 ] );
     }
+    
+    
 }
 
 void Sjf_AAIM_DrumsAudioProcessorEditor::setPattern()
@@ -383,5 +383,35 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::setPattern()
         for ( size_t j = 0; j < pat.size(); j++ )
             patternMultiTog.setToggleState( row, static_cast<int>(j), pat[ j ] );
     }
+    displayChangedIOI();
+}
 
+
+void Sjf_AAIM_DrumsAudioProcessorEditor::setPatternMultiTogColours()
+{
+    for ( int i = 0; i < MAX_NUM_STEPS; i++ )
+    {
+        auto colour1 = otherLookAndFeel.sliderFillColour;
+        if( i >= nBeatsNumBox.getValue() )
+            patternMultiTog.setColumnColour( i, juce::Colours::darkgrey );
+        else if ( i % 4 == 0 )
+            patternMultiTog.setColumnColour( i, colour1 );
+        else
+            patternMultiTog.setColumnColour( i, findColour( juce::ToggleButton::tickColourId ) );
+    }
+}
+
+
+void Sjf_AAIM_DrumsAudioProcessorEditor::displayChangedIOI()
+{
+    auto probs = audioProcessor.getIOIProbability();
+    for ( size_t i = 0; i < probs.size(); i++ )
+    {
+        if ( m_ioiProbs[ i ] != probs[ i ][ 1 ] )
+        {
+            m_ioiProbs[ i ] = probs[ i ][ 1 ];
+            m_changedIOI = i;
+            ioiLabel.setText( "division:"+juce::String( probs[ i ][ 0 ] ) + " chance:" + juce::String( probs[ i ][ 1 ] ), juce::dontSendNotification );
+        }
+    }
 }

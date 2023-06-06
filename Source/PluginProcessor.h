@@ -70,7 +70,6 @@ public:
     void setPattern( int row, std::vector<bool> pattern );
     const std::vector<bool>& getPattern( int row );
     
-    size_t getNumVoices(){ return m_pVary.size(); };
     
     void setIOIProbability( float division, float chanceForThatDivision)
     { m_rGen.setIOIProbability( division, chanceForThatDivision); };
@@ -106,7 +105,13 @@ public:
     
     void rotatePattern( bool trueIfLeftFalseIfRight);
     
-    void setNumBeats( int nBeats ) { m_nBeatsBanks[ *bankNumberParameter ] = nBeats; }
+    void setNumBeats( int nBeats )
+    {
+        m_nBeatsBanks[ *bankNumberParameter ] = nBeats;
+        m_rGen.setNumBeats( m_nBeatsBanks[ *bankNumberParameter ] );
+        for ( size_t i = 0; i < NUM_VOICES; i++ )
+            m_pVary[ i ].setNumBeats( m_nBeatsBanks[ *bankNumberParameter ] );
+    }
     size_t getNumBeats(){ return m_nBeatsBanks[ *bankNumberParameter ]; }
     
     void setTsDenominator( int tsDenominator ){ m_divBanks[ *bankNumberParameter ] = tsDenominator; }
@@ -141,7 +146,7 @@ private:
         halfNote = 1, quarterNote, eightNote, sixteenthNote, thirtySecondNote, sixtyFourthNote
     };
     
-    int /*m_tsDenominator = eightNote,*/ m_midiChannel = 1, m_currentStep = -1/*, m_patternBankState = loadButDontSave,*/ /*m_nBeats = 8*/;
+    int m_midiChannel = 1, m_currentStep = -1, m_lastLoadedBank = -1;
     double m_lastRGenPhase = 1;
     
 
