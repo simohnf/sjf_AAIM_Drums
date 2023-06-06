@@ -123,7 +123,7 @@ private:
     
     void setParameters();
     
-    void setPatternBankSelection();
+//    void setPatternBankSelection();
     
     static BusesProperties getBusesLayout()
     {

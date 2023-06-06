@@ -134,8 +134,7 @@ void Sjf_AAIM_DrumsAudioProcessor::changeProgramName (int index, const juce::Str
 //==============================================================================
 void Sjf_AAIM_DrumsAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    setParameters();
 }
 
 void Sjf_AAIM_DrumsAudioProcessor::releaseResources()

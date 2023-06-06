@@ -108,6 +108,7 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
     bankNumberAttachment.reset( new juce::AudioProcessorValueTreeState::SliderAttachment( valueTreeState, "patternBank", bankNumber ) );
     bankNumber.onValueChange = [this]
     {
+        DBG("changed " << bankNumber.getValue() );
         patternBankMultiTog.setAllToggles( false );
         patternBankMultiTog.setToggleState( 0, bankNumber.getValue(), true );
         patternBankMultiTog.onMouseEvent();
@@ -254,7 +255,7 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
      
     //-------------------------------------------------
     addAndMakeVisible( &posDisplay );
-    
+    posDisplay.setInterceptsMouseClicks( false, false );
     posDisplay.setBackGroundColour( juce::Colours::white.withAlpha( 0.0f ) );
     posDisplay.setForeGroundColour( juce::Colours::darkred.withAlpha( 0.2f ) );
     
