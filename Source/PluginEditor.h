@@ -18,6 +18,9 @@
 //==============================================================================
 /**
 */
+
+
+
 class sjf_positionDisplay : public juce::Component
 {
 public:
@@ -25,6 +28,7 @@ public:
     {
         m_bgColour = juce::Colours::black.withAlpha( 0.2f );
         m_fgColour = juce::Colours::white.withAlpha( 0.2f );
+        m_outlineColour = juce::Colours::red.withAlpha( 0.2f );
     }
     ~sjf_positionDisplay(){}
     
@@ -37,6 +41,14 @@ public:
         auto w = static_cast< float >( getWidth() ) / static_cast< float >( m_nSteps );
         auto r = juce::Rectangle< float >( m_Xpos, 0, w, getHeight() );
         g.fillRect( r );
+        
+        if (!m_drawOutlineFlag )
+            return;
+        
+        g.setColour( m_outlineColour );
+        g.drawRect( getLocalBounds() );
+        for ( int i = 1; i < m_nSteps-1; i++ )
+            g.drawLine( w*i, 0, w*i, getHeight() );
     }
     
     void setBackGroundColour( juce::Colour c )
@@ -48,6 +60,12 @@ public:
     {
         m_fgColour = c;
     }
+    
+    void setOutlineColour( juce::Colour c )
+    {
+        m_outlineColour = c;
+    }
+    
     
     void setCurrentStep( int step )
     {
@@ -61,10 +79,16 @@ public:
         m_nSteps = steps;
     }
     
+    void shouldDrawOutline( bool trueIfShouldDrawOutline )
+    {
+        m_drawOutlineFlag = trueIfShouldDrawOutline;
+    }
+    
 private:
-    juce::Colour m_bgColour, m_fgColour;
+    juce::Colour m_bgColour, m_fgColour, m_outlineColour;
     float m_Xpos = 0;
     int m_nSteps = 32;
+    bool m_drawOutlineFlag = false;
 };
 
 class Sjf_AAIM_DrumsAudioProcessorEditor  : public juce::AudioProcessorEditor, public juce::Timer
@@ -90,18 +114,22 @@ private:
     
     juce::AudioProcessorValueTreeState& valueTreeState;
     
-    juce::Slider compSlider, restSlider, fillsSlider, bankNumber;
+    juce::Slider compSlider, restSlider, fillsSlider, swingSlider, bankNumber;
+//    sjf_radioButtonSlider bankNumber;
     
     sjf_numBox nBeatsNumBox;
     juce::ComboBox divisionComboBox;
     
-    std::unique_ptr< juce::AudioProcessorValueTreeState::SliderAttachment > compSliderAttachment, restSliderAttachment, fillsSliderAttachment, /*nBeatsNumBoxAttachment,*/ bankNumberAttachment;
-//    std::unique_ptr< juce::AudioProcessorValueTreeState::ComboBoxAttachment > divisionComboBoxAttachment;
+    std::unique_ptr< juce::AudioProcessorValueTreeState::SliderAttachment > compSliderAttachment, restSliderAttachment, fillsSliderAttachment, swingSliderAttachment, bankNumberAttachment;
+    std::unique_ptr< juce::AudioProcessorValueTreeState::ButtonAttachment > internalSyncResetButtonAttachment;
     
-    sjf_multitoggle patternMultiTog, patternBankMultiTog;
-    sjf_positionDisplay posDisplay;
+    
+    sjf_multitoggle patternMultiTog;
+    sjf_positionDisplay posDisplay, bankDisplay;
     sjf_multislider ioiProbsSlider;
+    
     sjf_lookAndFeel otherLookAndFeel;
+    juce::LookAndFeel_V4 LandF2;
     
     std::array< std::string, 6 > divNames { "/2", "/4", "/8", "/16", "/32", "/64" };
     
@@ -110,7 +138,7 @@ private:
         juce::Colours::darkred, juce::Colours::darkblue, juce::Colours::darkgreen, juce::Colours::darkcyan, juce::Colours::darksalmon
     };
     
-    juce::ToggleButton tooltipsToggle;
+    juce::ToggleButton tooltipsToggle, internalSyncResetButton;
     juce::TextButton reverseButton, markovHButton, shuffleButton, palindromeButton, doubleButton, rotateLeftButton, rotateRightButton;
     juce::Label tooltipLabel;
     juce::String MAIN_TOOLTIP = "sjf_AAIM_Drums: \nAlgorithmic variations of drum patterns \n";
@@ -120,7 +148,7 @@ private:
     
     int m_selectedBank = 0, m_lastStep = -1;
     size_t m_changedIOI = 0;
-    bool m_nBeatsDragFlag = false;
+    bool m_nBeatsDragFlag = false, m_bankFlag = false;
     
     std::array< float, NUM_IOIs > m_ioiProbs;
     juce::Label ioiLabel;

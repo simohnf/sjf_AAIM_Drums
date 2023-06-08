@@ -25,18 +25,15 @@ Sjf_AAIM_DrumsAudioProcessor::Sjf_AAIM_DrumsAudioProcessor()
 #endif
 {
     DBG( "AAIM Drums" );
-    DBG( sizeof(double) * CHAR_BIT << " " <<  std::pow(2, sizeof(double) * CHAR_BIT ));
     
-//    nBeatsParameter = parameters.getRawParameterValue("nBeats");
-//    tsDenominatorParameter = parameters.getRawParameterValue("tsDenominator");
     midiChannelParameter = parameters.getRawParameterValue( "midiChannel");
     complexityParameter = parameters.getRawParameterValue("complexity");
     restsParameter = parameters.getRawParameterValue("rests");
     fillsParameter = parameters.getRawParameterValue("fills");
+    swingParameter = parameters.getRawParameterValue("swing");
     bankNumberParameter = parameters.getRawParameterValue("patternBank");
+    internalResetParameter = parameters.getRawParameterValue("internalReset");
     
-//    for( size_t i = 0; i < patternParameters.size(); i++ )
-//        patternParameters[ i ] = parameters.state.getPropertyAsValue( "pattern" + juce::String(i), nullptr, true );
     for ( size_t i = 0; i < NUM_IOIs; i++ )
     {
         ioiDivParameters[ i ] = parameters.state.getPropertyAsValue( "ioiDiv" + juce::String(i), nullptr, true );
@@ -62,6 +59,7 @@ Sjf_AAIM_DrumsAudioProcessor::Sjf_AAIM_DrumsAudioProcessor()
             m_patternBanks[ i ][ j ].reset();
     }
 
+    selectPatternBank();
     setParameters();
 }
 
@@ -134,6 +132,7 @@ void Sjf_AAIM_DrumsAudioProcessor::changeProgramName (int index, const juce::Str
 //==============================================================================
 void Sjf_AAIM_DrumsAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    selectPatternBank();
     setParameters();
 }
 
@@ -171,7 +170,12 @@ bool Sjf_AAIM_DrumsAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 
 void Sjf_AAIM_DrumsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
-    setParameters();
+    //    selectPatternBank();
+        setParameters();
+    
+    auto swing = static_cast< float > ( *swingParameter );
+    swing = swing >= 0 ? 1.0f + ( swing * swing ) : 1.0f - ( 0.5f * swing * swing );
+    auto swingOnFlag = swing == 1 ? false : true;
     juce::ScopedNoDenormals noDenormals;
     buffer.clear(); // remove any noise in buffer...
     auto bufferSize = buffer.getNumSamples();
@@ -186,22 +190,31 @@ void Sjf_AAIM_DrumsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
         {
             auto indx = static_cast< double >( static_cast<int>(m_divBanks[ *bankNumberParameter ]) - 2 );
             auto beatDivFactor = std::pow( 2.0f, indx ); // multiple for converting from quarterNotes to other beat types
-            auto nBeats = static_cast< double >(m_rGen.getNumBeats());
+            //            auto nBeats = static_cast< double >(m_rGen.getNumBeats());
             auto timeInSamps = static_cast< double >(*positionInfo.getTimeInSamples());
             auto bpm = *positionInfo.getBpm();
             auto sr = getSampleRate();
-            // convert sample position to position on timeline in the underlying rhythmic division of the drumMachine
-            auto pos = ( (bpm * beatDivFactor * timeInSamps) / ( sr * static_cast< double >(60) ) );
             // calculate the increment per sample
             auto increment = (static_cast<double>(bpm) * beatDivFactor )/ ( sr * static_cast< double >(60) );
+            // convert sample position to position on timeline in the underlying rhythmic division of the drumMachine
+            auto hostPos = ( (bpm * beatDivFactor * timeInSamps) / ( sr * static_cast< double >(60) ) );
+            auto pos = hostPos;
             auto currentBeat = pos;
             for ( int i = 0; i < bufferSize; i++ )
             {
-                currentBeat = fastMod4< double >( ( pos + ( i * increment )), nBeats );
+                currentBeat = pos + ( i * increment );
+                currentBeat = swingOnFlag ? applySwingToPosition( currentBeat, swing ) : currentBeat ;
                 if ( static_cast<int>( currentBeat ) != m_currentStep )
                 {
-                    selectPatternBank();
+                    if ( selectPatternBank() )
+                        m_internalSyncCompensation = static_cast< bool >( *internalResetParameter ) ? currentBeat : 0;
+//                    setParameters();
+                    currentBeat = fastMod4< double >( currentBeat - m_internalSyncCompensation, m_nBeatsBanks[ *bankNumberParameter ] );
                     m_currentStep = static_cast< int >( currentBeat );
+                }
+                else
+                {
+                    currentBeat = fastMod4< double >( currentBeat - m_internalSyncCompensation, m_nBeatsBanks[ *bankNumberParameter ] );
                 }
                 auto genOut = m_rGen.runGenerator( currentBeat );
                 if ( genOut[ 0 ] < m_lastRGenPhase*0.5 ) // just a debounce check, it's possible to go backwards, but it has to go a good way
@@ -221,10 +234,41 @@ void Sjf_AAIM_DrumsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
                 m_lastRGenPhase = genOut[ 0 ];
             }
         }
+        else
+        {
+            selectPatternBank();
+//            setParameters();
+        }
+    }
+    else
+    {
+        selectPatternBank();
+//        setParameters();
     }
 }
 
 //==============================================================================
+double Sjf_AAIM_DrumsAudioProcessor::calculateCurrentBeat( double currentBeat, double hostPosition, double increment, size_t sampleIndex, bool swingOnFlag, float swing )
+{
+    currentBeat = swingOnFlag ? applySwingToPosition( hostPosition + ( sampleIndex * increment ), swing ) : hostPosition + ( sampleIndex * increment ) ;
+    currentBeat = fastMod4< double >( currentBeat, m_nBeatsBanks[ *bankNumberParameter ] );
+    if ( static_cast<int>( currentBeat ) != m_currentStep )
+    {
+        selectPatternBank();
+        m_currentStep = static_cast< int >( currentBeat );
+    }
+    return currentBeat;
+}
+
+double Sjf_AAIM_DrumsAudioProcessor::applySwingToPosition( double currentBeat, float swing )
+{
+    auto halfPos = currentBeat * 0.5;
+    auto modPos = halfPos - static_cast< int >( halfPos );
+    modPos = std::pow( modPos, swing );
+    return (static_cast<float>(static_cast< int >( halfPos )) + modPos) * 2.0f;
+}
+
+
 bool Sjf_AAIM_DrumsAudioProcessor::hasEditor() const
 {
     return true; // (change this to false if you choose to not supply an editor)
@@ -262,9 +306,7 @@ void Sjf_AAIM_DrumsAudioProcessor::setNonAutomatableParameterValues()
             {
                 auto pat = m_patternBanks[ i ][ j ].to_ullong();
                 auto patDouble = static_cast<double>( pat );
-                DBG( "pat"<< pat << " double "<< patDouble );
                 patternBanksParameters[ i ][ j ].setValue( patDouble );
-                DBG( "pattBank"<<i<<"v"<<j<< " "<<juce::String( patternBanksParameters[ i ][ j ].getValue() ) );
             }
             patternBanksNumBeatsParameters[ i ].setValue( static_cast<double>( m_nBeatsBanks[ i ] ) );
             divBanksParameters[ i ].setValue( static_cast< double >( m_divBanks[ i ] ) );
@@ -275,6 +317,7 @@ void Sjf_AAIM_DrumsAudioProcessor::setNonAutomatableParameterValues()
 
 void Sjf_AAIM_DrumsAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
+    m_lastLoadedBank = -1;
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
     if (xmlState.get() != nullptr)
     {
@@ -305,11 +348,11 @@ void Sjf_AAIM_DrumsAudioProcessor::setStateInformation (const void* data, int si
                 auto prob = ioiProbParameters[ i ].getValue();
                 m_rGen.setIOIProbability( div, prob );
             }
-            setParameters();
-            m_stateLoadedFlag = true;
         }
-//        selectPatternBank();
     }
+    selectPatternBank();
+    setParameters();
+    m_stateLoadedFlag = true;
 }
 //==============================================================================
 juce::AudioProcessorValueTreeState::ParameterLayout Sjf_AAIM_DrumsAudioProcessor::createParameterLayout()
@@ -319,8 +362,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout Sjf_AAIM_DrumsAudioProcessor
     params.add( std::make_unique<juce::AudioParameterFloat>( juce::ParameterID{ "complexity", pIDVersionNumber }, "Complexity", 0, 1, 0 ) );
     params.add( std::make_unique<juce::AudioParameterFloat>( juce::ParameterID{ "rests", pIDVersionNumber }, "Rests", 0, 1, 0 ) );
     params.add( std::make_unique<juce::AudioParameterFloat>( juce::ParameterID{ "fills", pIDVersionNumber }, "Fills", 0, 1, 0 ) );
+    params.add( std::make_unique<juce::AudioParameterFloat>( juce::ParameterID{ "swing", pIDVersionNumber }, "Swing", -1, 1, 0 ) );
     params.add( std::make_unique<juce::AudioParameterInt>( juce::ParameterID{ "midiChannel", pIDVersionNumber }, "MidiChannel", 1, 16, 1 ) );
     params.add( std::make_unique<juce::AudioParameterInt>( juce::ParameterID{ "patternBank", pIDVersionNumber }, "PatternBank", 0, 15, 0 ) );
+    params.add( std::make_unique<juce::AudioParameterBool>( juce::ParameterID{ "internalReset", pIDVersionNumber }, "InternalReset", true ) );
     return params;
 }
 
@@ -341,22 +386,18 @@ const std::vector<bool>& Sjf_AAIM_DrumsAudioProcessor::getPattern( int row )
 //==============================================================================
 void Sjf_AAIM_DrumsAudioProcessor::setParameters()
 {
-    selectPatternBank();
+//    selectPatternBank();
     m_rGen.setComplexity( *complexityParameter );
     m_rGen.setRests( *restsParameter );
-//    m_rGen.setNumBeats( m_nBeatsBanks[ *bankNumberParameter ] );
     for (size_t i = 0; i < m_pVary.size(); i++ )
-    {
-//        m_pVary[ i ].setNumBeats( m_rGen.getNumBeats() );
         m_pVary[ i ].setFills( *fillsParameter );
-    }
     m_midiChannel = *midiChannelParameter;
 }
 
-void Sjf_AAIM_DrumsAudioProcessor::selectPatternBank()
+bool Sjf_AAIM_DrumsAudioProcessor::selectPatternBank()
 {
     if ( m_lastLoadedBank == *bankNumberParameter )
-        return;
+        return false;
     m_rGen.setNumBeats( m_nBeatsBanks[ *bankNumberParameter ] );
     for ( size_t i = 0; i < NUM_VOICES; i++ )
     {
@@ -364,9 +405,9 @@ void Sjf_AAIM_DrumsAudioProcessor::selectPatternBank()
         for ( size_t j = 0; j < m_nBeatsBanks[ *bankNumberParameter ]; j++ )
             m_pVary[ i ].setBeat( j, m_patternBanks[ *bankNumberParameter ][ i ][ j ] );
     }
-//    updateHostDisplay();
     m_lastLoadedBank = *bankNumberParameter;
     m_stateLoadedFlag = true;
+    return true;
 }
 
 void Sjf_AAIM_DrumsAudioProcessor::copyPatternBankContents( size_t bankToCopyFrom, size_t bankToCopyTo )
@@ -380,7 +421,6 @@ void Sjf_AAIM_DrumsAudioProcessor::copyPatternBankContents( size_t bankToCopyFro
 //      ALGORITHMIC VARIATIONS
 void Sjf_AAIM_DrumsAudioProcessor::reversePattern()
 {
-//    auto nBeats = m_rGen.getNumBeats();
     for ( size_t i = 0; i < m_pVary.size(); i++ )
     {
         auto pat = std::bitset< MAX_NUM_STEPS >( m_pVary[ i ].getPatternLong() );
@@ -399,7 +439,6 @@ void Sjf_AAIM_DrumsAudioProcessor::markovHorizontal()
 {
     // create a transition table for each voice
     // then pass each into markov chain
-//    auto nBeats = m_rGen.getNumBeats();
     auto nVoices = m_pVary.size();
     for ( size_t i = 0; i < nVoices; i++ )
     {
@@ -433,8 +472,6 @@ void Sjf_AAIM_DrumsAudioProcessor::markovHorizontal()
 
 void Sjf_AAIM_DrumsAudioProcessor::cellShuffleVariation()
 {
-//    auto nBeats = m_rGen.getNumBeats();
-//    auto nVoices = m_pVary.size();
     auto indis = m_rGen.getBaseindispensability();
     std::vector < size_t > steps{ };
     auto count = 1ul;
@@ -514,7 +551,6 @@ void Sjf_AAIM_DrumsAudioProcessor::doublePattern()
 {
     auto nBeats = m_nBeatsBanks[ *bankNumberParameter ] * 2;
     nBeats = ( nBeats > MAX_NUM_STEPS ) ? MAX_NUM_STEPS : nBeats;
-//    m_rGen.setNumBeats( nBeats );
     m_nBeatsBanks[ *bankNumberParameter ] = static_cast<int>(nBeats);
     for ( size_t i = 0; i < m_pVary.size(); i++ )
     {
@@ -532,7 +568,6 @@ void Sjf_AAIM_DrumsAudioProcessor::doublePattern()
 
 void Sjf_AAIM_DrumsAudioProcessor::rotatePattern( bool trueIfLeftFalseIfRight)
 {
-//    auto nBeats = m_rGen.getNumBeats();
     for ( size_t i = 0; i < m_pVary.size(); i++ )
     {
         auto pat = std::bitset< MAX_NUM_STEPS >( m_pVary[ i ].getPatternLong() );

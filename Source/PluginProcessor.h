@@ -91,7 +91,7 @@ public:
     
     void copyPatternBankContents( size_t bankToCopyFrom, size_t bankToCopyTo );
     
-    void selectPatternBank();
+    bool selectPatternBank();
     
     void reversePattern();
     
@@ -123,14 +123,15 @@ private:
     
     void setParameters();
     
-//    void setPatternBankSelection();
-    
     static BusesProperties getBusesLayout()
     {
         // Live doesn't like to load midi-only plugins, so we add an audio output there.
         return juce::PluginHostType().isAbletonLive() ? BusesProperties().withOutput ("out", juce::AudioChannelSet::stereo())
                                                 : BusesProperties();
     }
+    
+    double calculateCurrentBeat( double currentBeat, double hostPosition, double increment, size_t sampleIndex, bool swingOnFlag, float swing );
+    double applySwingToPosition( double currentBeat, float swing );
     
     juce::AudioProcessorValueTreeState parameters;
     
@@ -146,27 +147,25 @@ private:
         halfNote = 1, quarterNote, eightNote, sixteenthNote, thirtySecondNote, sixtyFourthNote
     };
     
-    int m_midiChannel = 1, m_currentStep = -1, m_lastLoadedBank = -1;
-    double m_lastRGenPhase = 1;
+    int m_midiChannel = 1, m_currentStep = -1, m_lastLoadedBank = -1, m_internalCount = 0;;
+    double m_lastRGenPhase = 1, m_lastBankChangePosition = 0, m_lastHostPosition = 0, m_internalSyncCompensation = 0;
     
-
-    // REWRITE SO ALL CHANGES ARE AUTOMATICALLY IN PATTERN BANK... THIS COULD BE A PAIN FOR UNDO, BUT NOT THE END OF THE WORLD
     std::atomic<float>* midiChannelParameter = nullptr;
     std::atomic<float>* complexityParameter = nullptr;
     std::atomic<float>* restsParameter = nullptr;
     std::atomic<float>* fillsParameter = nullptr;
+    std::atomic<float>* swingParameter = nullptr;
     std::atomic<float>* bankNumberParameter = nullptr;
+    std::atomic<float>* internalResetParameter = nullptr;
     
     
     
     std::array< juce::Value, NUM_IOIs > ioiDivParameters, ioiProbParameters;
-//    std::array< juce::Value, NUM_VOICES > patternParameters;
     std::array< std::array< juce::Value, NUM_VOICES >, NUM_BANKS > patternBanksParameters;
     std::array< juce::Value, NUM_BANKS > patternBanksNumBeatsParameters, divBanksParameters;
     std::array< std::array< std::bitset< MAX_NUM_STEPS >, NUM_VOICES >, NUM_BANKS > m_patternBanks;
     std::array< size_t, NUM_BANKS > m_nBeatsBanks, m_divBanks;
     bool m_stateLoadedFlag = false;
-//    size_t m_patternBank = 0;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Sjf_AAIM_DrumsAudioProcessor)
 };

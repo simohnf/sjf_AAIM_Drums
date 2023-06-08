@@ -50,8 +50,16 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
     fillsSlider.sendLookAndFeelChange();
     
     //-------------------------------------------------
+    addAndMakeVisible( &swingSlider );
+    swingSlider.setSliderStyle( juce::Slider::Rotary );
+    swingSliderAttachment.reset( new juce::AudioProcessorValueTreeState::SliderAttachment ( valueTreeState, "swing", swingSlider )  );
+    swingSlider.setDoubleClickReturnValue( true, 0.0f );
+    swingSlider.setTextBoxStyle( juce::Slider::TextBoxBelow, false, restSlider.getWidth(), TEXT_HEIGHT );
+    swingSlider.sendLookAndFeelChange();
+    swingSlider.setTooltip( "This will swing the currently selected rhythmic division" );
+    
+    //-------------------------------------------------
     addAndMakeVisible( &nBeatsNumBox );
-//    nBeatsNumBoxAttachment.reset( new juce::AudioProcessorValueTreeState::SliderAttachment( valueTreeState, "nBeats", nBeatsNumBox ) );
     nBeatsNumBox.sendLookAndFeelChange();
     nBeatsNumBox.setRange( 1, 32, 1 );
     nBeatsNumBox.setValue( audioProcessor.getNumBeats() );
@@ -69,6 +77,12 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
     };
     nBeatsNumBox.setTooltip( "This sets the number of beats in the pattern" );
     nBeatsNumBox.sendLookAndFeelChange();
+    
+    //-------------------------------------------------
+    addAndMakeVisible( &internalSyncResetButton );
+    internalSyncResetButtonAttachment.reset( new juce::AudioProcessorValueTreeState::ButtonAttachment( valueTreeState, "internalReset", internalSyncResetButton ) );
+    internalSyncResetButton.setButtonText( "Internal" );
+    internalSyncResetButton.setTooltip( "If activated this will reset the current position to zero anytime the pattern bank is changed (useful if changing time     signatures when automating pattern bank changes).\nIf deactivated the playback position will always be based on the hosts current position" );
     
     //-------------------------------------------------
     addAndMakeVisible( &divisionComboBox );
@@ -106,31 +120,39 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
     
     //-------------------------------------------------
     bankNumberAttachment.reset( new juce::AudioProcessorValueTreeState::SliderAttachment( valueTreeState, "patternBank", bankNumber ) );
+    addAndMakeVisible( &bankNumber );
+    bankNumber.setLookAndFeel( &LandF2 );
+    bankNumber.setSliderStyle( juce::Slider::LinearHorizontal );
+    bankNumber.setTextBoxStyle( juce::Slider::NoTextBox, true, 0, 0 );
+    bankNumber.setSliderSnapsToMousePosition( true );
+    bankNumber.setColour( juce::Slider::backgroundColourId, juce::Colours::white.withAlpha( 0.0f ) );
+    bankNumber.setColour( juce::Slider::thumbColourId, juce::Colours::white.withAlpha( 0.0f ) );
+    bankNumber.setColour( juce::Slider::trackColourId, juce::Colours::white.withAlpha( 0.0f ) );
     bankNumber.onValueChange = [this]
     {
-        DBG("changed " << bankNumber.getValue() );
-        patternBankMultiTog.setAllToggles( false );
-        patternBankMultiTog.setToggleState( 0, bankNumber.getValue(), true );
-        patternBankMultiTog.onMouseEvent();
-    };
-    addAndMakeVisible( &patternBankMultiTog );
-    patternBankMultiTog.setNumRowsAndColumns( 1, NUM_BANKS );
-    patternBankMultiTog.setIsRadioGroup( true );
-    patternBankMultiTog.setRowColour( 0, juce::Colours::grey.withAlpha(0.8f) );
-    patternBankMultiTog.setColour( sjf_multitoggle::backgroundColourId, multiTogBgCol );
-    patternBankMultiTog.setToggleState( 0, bankNumber.getValue(), true );
-    m_selectedBank = bankNumber.getValue();
-    patternBankMultiTog.onMouseEvent = [this]
-    {
-        auto selectedBank = patternBankMultiTog.getPressedButton();
-        DBG("selected " << selectedBank );
-        if ( juce::ModifierKeys::getCurrentModifiers().isShiftDown() )
+        auto selectedBank = bankNumber.getValue();
+        bankDisplay.setCurrentStep( selectedBank );
+        if ( juce::ModifierKeys::getCurrentModifiers().isShiftDown() && m_bankFlag )
             audioProcessor.copyPatternBankContents( m_selectedBank, selectedBank );
         m_selectedBank = selectedBank;
-        bankNumber.setValue( m_selectedBank );
     };
-    patternBankMultiTog.setTooltip( "This allows you to store and recall different patterns \n\nHold the shift key and press on a new bank number to copy a pattern to a new bank" );
+    bankNumber.onDragStart = [this]
+    {
+        m_bankFlag = true;
+    };
+    bankNumber.onDragEnd = [this]
+    {
+        m_bankFlag = false;
+    };
+    bankNumber.setTooltip( "This allows you to store and recall different patterns \n\nHold the shift key and press on a new bank number to copy a pattern to a new bank" );
     
+    addAndMakeVisible( &bankDisplay );
+    bankDisplay.setInterceptsMouseClicks( false, false );
+    bankDisplay.setBackGroundColour( juce::Colours::white.withAlpha( 0.1f ) );
+    bankDisplay.setForeGroundColour( juce::Colours::darkred.withAlpha( 0.2f ) );
+    bankDisplay.setOutlineColour( otherLookAndFeel.outlineColour );
+    bankDisplay.setNumSteps( NUM_BANKS );
+    bankDisplay.shouldDrawOutline( true );
     //-------------------------------------------------
     addAndMakeVisible( &ioiProbsSlider );
     ioiProbsSlider.setNumSliders( static_cast< int >( audioProcessor.ioiFactors.size() ) );
@@ -170,7 +192,7 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
         audioProcessor.markovHorizontal();
         setPattern();
     };
-    markovHButton.setTooltip( "This will generate a variation of the current pattern using a markov chain" );
+    markovHButton.setTooltip( "This will generate a variation of the current pattern using a markov chain\n\nProbably best to copy your pattern to a new bank beforeapplying variations" );
     
     //-------------------------------------------------
     addAndMakeVisible( &shuffleButton );
@@ -180,7 +202,7 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
         audioProcessor.cellShuffleVariation();
         setPattern();
     };
-    shuffleButton.setTooltip( "This will shuffle the currently pattern" );
+    shuffleButton.setTooltip( "This will shuffle the current pattern\n\nProbably best to copy your pattern to a new bank beforeapplying variations" );
     
     //-------------------------------------------------
     addAndMakeVisible( &palindromeButton );
@@ -191,7 +213,7 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
         nBeatsNumBox.setValue( audioProcessor.getNumBeats() );
         setPattern();
     };
-    palindromeButton.setTooltip( "This will create a palindrome of the current pattern" );
+    palindromeButton.setTooltip( "This will create a palindrome of the current pattern\n\nProbably best to copy your pattern to a new bank beforeapplying variations" );
     
     //-------------------------------------------------
     
@@ -266,6 +288,7 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
 Sjf_AAIM_DrumsAudioProcessorEditor::~Sjf_AAIM_DrumsAudioProcessorEditor()
 {
     setLookAndFeel( nullptr );
+    bankNumber.setLookAndFeel( nullptr );
 }
 
 //==============================================================================
@@ -289,13 +312,14 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::paint (juce::Graphics& g)
     g.drawFittedText ( "Complexity", compSlider.getX(), compSlider.getY() - TEXT_HEIGHT, compSlider.getWidth(), TEXT_HEIGHT, juce::Justification::centred, 1);
     g.drawFittedText ( "Rests", restSlider.getX(), restSlider.getY() - TEXT_HEIGHT, restSlider.getWidth(), TEXT_HEIGHT, juce::Justification::centred, 1);
     g.drawFittedText ( "Fills", fillsSlider.getX(), fillsSlider.getY() - TEXT_HEIGHT, fillsSlider.getWidth(), TEXT_HEIGHT, juce::Justification::centred, 1);
+    g.drawFittedText( "Swing", swingSlider.getX(), swingSlider.getY() - TEXT_HEIGHT, swingSlider.getWidth(), TEXT_HEIGHT, juce::Justification::centred, 1);
     g.drawFittedText ( "Rhythmic Division Probabilities", ioiProbsSlider.getX(), ioiProbsSlider.getY() - TEXT_HEIGHT, ioiProbsSlider.getWidth(), TEXT_HEIGHT, juce::Justification::centred, 1);
     g.drawFittedText ( "Time Signature: ", nBeatsNumBox.getX()-SLIDERSIZE, nBeatsNumBox.getY(), SLIDERSIZE, TEXT_HEIGHT, juce::Justification::right, 1);
     for ( int i = 0; i < NUM_BANKS; i++ )
     {
-        auto w = patternBankMultiTog.getWidth()/NUM_BANKS;
-        auto x = patternBankMultiTog.getX() + w*i;
-        g.drawFittedText ( juce::String(i), x, patternBankMultiTog.getY(), w, TEXT_HEIGHT, juce::Justification::centred, 1);
+        auto w = bankDisplay.getWidth()/NUM_BANKS;
+        auto x = bankDisplay.getX() + w*i;
+        g.drawFittedText ( juce::String(i), x, bankDisplay.getY(), w, TEXT_HEIGHT, juce::Justification::centred, 1);
     }
 }
 
@@ -304,7 +328,8 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::resized()
     compSlider.setBounds( INDENT, TEXT_HEIGHT*2, SLIDERSIZE, SLIDERSIZE);
     restSlider.setBounds( compSlider.getRight(), compSlider.getY(), SLIDERSIZE, SLIDERSIZE);
     fillsSlider.setBounds( restSlider.getRight(), restSlider.getY(), SLIDERSIZE, SLIDERSIZE);
-    ioiProbsSlider.setBounds( fillsSlider.getRight(), fillsSlider.getY(), SLIDERSIZE*5, SLIDERSIZE );
+    swingSlider.setBounds( fillsSlider.getRight(), fillsSlider.getY(), SLIDERSIZE, SLIDERSIZE);
+    ioiProbsSlider.setBounds( swingSlider.getRight(), swingSlider.getY(), SLIDERSIZE*4, SLIDERSIZE );
     ioiLabel.setBounds( ioiProbsSlider.getX(), ioiProbsSlider.getY(), ioiProbsSlider.getWidth(), ioiProbsSlider.getHeight() );
     
     
@@ -318,13 +343,14 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::resized()
     rotateLeftButton.setBounds( doubleButton.getRight(), doubleButton.getY(), SLIDERSIZE/2, TEXT_HEIGHT );
     rotateRightButton.setBounds( rotateLeftButton.getRight(), rotateLeftButton.getY(), SLIDERSIZE/2, TEXT_HEIGHT );
     
-    tooltipsToggle.setBounds( ioiProbsSlider.getRight() - SLIDERSIZE, divisionComboBox.getY(), SLIDERSIZE, TEXT_HEIGHT );
+    internalSyncResetButton.setBounds( ioiProbsSlider.getRight() - SLIDERSIZE*2, divisionComboBox.getY(), SLIDERSIZE, TEXT_HEIGHT );
+    tooltipsToggle.setBounds( internalSyncResetButton.getRight(), divisionComboBox.getY(), SLIDERSIZE, TEXT_HEIGHT );
     
-//    posDisplay.setBounds( compSlider.getX(), nBeatsNumBox.getBottom(), SLIDERSIZE*8, TEXT_HEIGHT );
-//    patternMultiTog.setBounds( posDisplay.getX(), posDisplay.getBottom(), SLIDERSIZE*8, SLIDERSIZE*4 );
     patternMultiTog.setBounds( compSlider.getX(), nBeatsNumBox.getBottom(), SLIDERSIZE*8, SLIDERSIZE*4 );
     posDisplay.setBounds( patternMultiTog.getBounds() );
-    patternBankMultiTog.setBounds( patternMultiTog.getX(), patternMultiTog.getBottom(), patternMultiTog.getWidth(), TEXT_HEIGHT );
+    
+    bankNumber.setBounds( patternMultiTog.getX(), patternMultiTog.getBottom(), patternMultiTog.getWidth(), TEXT_HEIGHT );
+    bankDisplay.setBounds( patternMultiTog.getX(), patternMultiTog.getBottom(), patternMultiTog.getWidth(), TEXT_HEIGHT );
     
     tooltipLabel.setBounds( 0, HEIGHT, WIDTH, TEXT_HEIGHT*4 );
 }
@@ -339,8 +365,7 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::timerCallback()
         setPattern();
         setIOISliderValues();
         setPatternMultiTogColours();
-        patternBankMultiTog.setAllToggles( false );
-        patternBankMultiTog.setToggleState( 0, bankNumber.getValue(), true );
+        displayChangedIOI();
         audioProcessor.setStateLoadedFalse();
     }
     auto step = audioProcessor.getCurrentStep();
@@ -370,8 +395,6 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::setIOISliderValues()
         }
         ioiProbsSlider.setSliderValue( sliderNum, probs[ i ][ 1 ] );
     }
-    
-    
 }
 
 void Sjf_AAIM_DrumsAudioProcessorEditor::setPattern()
@@ -384,7 +407,6 @@ void Sjf_AAIM_DrumsAudioProcessorEditor::setPattern()
         for ( size_t j = 0; j < pat.size(); j++ )
             patternMultiTog.setToggleState( row, static_cast<int>(j), pat[ j ] );
     }
-    displayChangedIOI();
 }
 
 
