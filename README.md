@@ -19,3 +19,5 @@ cd sjf_AAIM_Drums
 git submodule update --init --recursive
 ```
 ---------------
+
+Logo by [Molotov Ape](https://molotovape.bandcamp.com/)
