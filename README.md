@@ -4,6 +4,14 @@ Plugin version of the [AAIM_rhythmGen and AAIM_patternVary](https://simohnf.gith
 To download:
 
 In terminal 
-'''
+```
 git clone https://github.com/simohnf/sjf_AAIM_Drums
-'''
+```
+
+```
+cd sjf_AAIM_Drums
+```
+
+```
+git submodule update --init --recursive
+```
