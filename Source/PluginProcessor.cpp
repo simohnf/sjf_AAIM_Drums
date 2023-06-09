@@ -26,13 +26,13 @@ Sjf_AAIM_DrumsAudioProcessor::Sjf_AAIM_DrumsAudioProcessor()
 {
     DBG( "AAIM Drums" );
     
-    midiChannelParameter = parameters.getRawParameterValue( "midiChannel");
-    complexityParameter = parameters.getRawParameterValue("complexity");
-    restsParameter = parameters.getRawParameterValue("rests");
-    fillsParameter = parameters.getRawParameterValue("fills");
-    swingParameter = parameters.getRawParameterValue("swing");
-    bankNumberParameter = parameters.getRawParameterValue("patternBank");
-    internalResetParameter = parameters.getRawParameterValue("internalReset");
+    midiChannelParameter = parameters.getRawParameterValue( "midiChannel" );
+    complexityParameter = parameters.getRawParameterValue( "complexity" );
+    restsParameter = parameters.getRawParameterValue( "rests" );
+    fillsParameter = parameters.getRawParameterValue( "fills" );
+    swingParameter = parameters.getRawParameterValue( "swing" );
+    bankNumberParameter = parameters.getRawParameterValue( "patternBank" );
+    internalResetParameter = parameters.getRawParameterValue( "internalReset" );
     
     for ( size_t i = 0; i < NUM_IOIs; i++ )
     {
@@ -153,13 +153,13 @@ bool Sjf_AAIM_DrumsAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
     // In this template code we only support mono or stereo.
     // Some plugin hosts, such as certain GarageBand versions, will only
     // load plugins that support stereo bus layouts.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+    if ( layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
+     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo() )
         return false;
 
     // This checks if the input layout matches the output layout
    #if ! JucePlugin_IsSynth
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+    if ( layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet() )
         return false;
    #endif
 
@@ -168,7 +168,7 @@ bool Sjf_AAIM_DrumsAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 }
 #endif
 
-void Sjf_AAIM_DrumsAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void Sjf_AAIM_DrumsAudioProcessor::processBlock ( juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages )
 {
     //    selectPatternBank();
         setParameters();
