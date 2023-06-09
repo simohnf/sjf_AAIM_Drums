@@ -64,15 +64,12 @@ Sjf_AAIM_DrumsAudioProcessorEditor::Sjf_AAIM_DrumsAudioProcessorEditor (Sjf_AAIM
     nBeatsNumBox.setRange( 1, 32, 1 );
     nBeatsNumBox.setValue( audioProcessor.getNumBeats() );
     nBeatsNumBox.setNumDecimalPlacesToDisplay( 0 );
-    nBeatsNumBox.onDragEnd = [this]
-    {
-        m_nBeatsDragFlag = true;
-    };
     nBeatsNumBox.onValueChange = [this]
     {
         if ( audioProcessor.stateLoaded() )
             return;
         audioProcessor.setNumBeats( nBeatsNumBox.getValue() );
+        patternMultiTog.onMouseEvent();
         setPatternMultiTogColours();
     };
     nBeatsNumBox.setTooltip( "This sets the number of beats in the pattern" );
