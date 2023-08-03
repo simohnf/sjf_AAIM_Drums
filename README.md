@@ -1,6 +1,6 @@
 # sjf_AAIM_Drums
 
-<img width="866" alt="AAIM_Drums" src="https://github.com/simohnf/sjf_AAIM_Drums/assets/12850558/5e5077e7-dc18-471e-8bef-b43567bdfd96">
+<img width="866" alt="AAIM_Drums" src="https://github.com/simohnf/sjf_AAIM_Drums/assets/12850558/2a1387a5-12cc-4769-9f7f-bf59dbd99b0d">
 
 
 Plugin version of the [AAIM_rhythmGen and AAIM_patternVary](https://simohnf.github.io/AAIM/) implemented as a vst and audio unit.
